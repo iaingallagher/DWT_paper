@@ -1,0 +1,185 @@
+---
+title: "DTW clustering"
+author: "Iain J Gallagher - adapted by Paul McMenemy 18/10/2020 onwards"
+date: "12/03/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+if (!"tidyverse" %in% installed.packages()) install.packages("tidyverse") ##
+library("tidyverse")##
+
+if (!"dtwclust" %in% installed.packages()) install.packages("dtwclust") ##
+library("dtwclust") ##
+
+if (!"TSclust" %in% installed.packages()) install.packages("TSclust") ##
+library("TSclust") ##
+
+if (!"gplots" %in% installed.packages()) install.packages("gplots") ##
+library("gplots") ##
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+In this document we will use the dynamic time warping algorithm to generate a distance matrix between different time series. We will then use KNN clustering to cluster the time series.
+
+```{r}
+# library(tidyverse) ##
+theme_set(theme_bw()) # PMC - is this used in the plot outputs?
+#library(dtwclust) # could use this  ##
+#library(TSclust) # or this  ##
+#library(gplots) #   ##
+#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") ## Iain's wd
+
+folders <- "M:/Sarcopenia Work/R Code" ##
+setwd(folders) ## Paul's wd ##
+
+rm(list=ls())
+```
+
+Load the data we will use.
+
+See https://damien-datasci-blog.netlify.com/post/time-series-clustering-with-dynamic-time-warp/ for details ##
+```{r}
+
+ts <- read_csv('sat_only_4_dtw.csv')
+# randomly sample to 20 only for testing
+samp_idx <- sample(seq(3,114), 20, replace=FALSE) ## QUESTION - why only sample from 3-114 indexes of ts?
+ts_samp <- ts[,samp_idx]
+
+# create a little inline function
+dtw_distance <- function(x){dist(x, method="DTW")}
+# cluster & heatmap
+ts_samp_mat <- as.matrix(sapply(ts_samp, as.numeric)) 
+col_nms <- colnames(ts_samp_mat)
+col_nms <- str_extract(col_nms, '[A-Z]{2,}')
+colnames(ts_samp_mat) <- col_nms
+# cluster & plot
+gplots::heatmap.2(ts_samp_mat, distfun = dtw_distance, hclustfun = hclust, dendrogram = "column", Rowv = FALSE, labRow = FALSE)
+```
+Ok, cool - it works.
+
+Let's try with ```TSclust```. There's a great guide [here](# https://damien-datasci-blog.netlify.com/post/time-series-clustering-with-dynamic-time-warp/) especially the ```ggplot2``` plotting of hierarchical clusters.
+
+```{r}
+# library(tidyverse) ##
+# theme_set(theme_bw()) ##
+# library(TSclust) # time series clustering methods ##
+# library(ggdendro) # dendrograms with ggplot2
+# library(gridExtra) # for plot layout
+# library(RColorBrewer) # palette
+# library(pheatmap) # heatmaps
+
+if (!"ggdendro" %in% installed.packages()) install.packages("ggdendro") ##
+library("ggdendro")## # dendrograms with ggplot2
+
+if (!"gridExtra" %in% installed.packages()) install.packages("gridExtra") ##
+library("gridExtra") ## # for plot layout
+
+if (!"RColorBrewer" %in% installed.packages()) install.packages("RColorBrewer") ##
+library("RColorBrewer") ## # palette
+
+if (!"pheatmap" %in% installed.packages()) install.packages("pheatmap") ##
+library("pheatmap") ## # heatmaps
+
+if (!"scales" %in% installed.packages()) install.packages("scales") ##
+library("scales") ## # allows use of function date_breaks in p2 plot
+
+rm(list=ls())
+
+#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") # Iain's wd
+folders <- "M:/Sarcopenia Work/R Code" ##
+setwd(folders) ## Paul's wd ##
+
+ts <- read_csv('sat_only_4_dtw.csv')
+tm <- ts$Time
+# randomly sample to 20 only for testing
+samp_idx <- sample(seq(3,114), 20, replace=FALSE) # QUESTION - why only sample from 3-114 indexes of ts?
+ts_samp <- ts[,-c(1,2)] ## obtain random samples without time or weekday
+
+# col_nms <- str_extract(colnames(ts_samp), '[A-Z]{2,}')
+# colnames(ts_samp) <- col_nms
+dist_mat <- diss(SERIES = t(ts_samp), METHOD = 'CORT', deltamethod="DTW")
+# heatmap of the distance matrix; how many clusters does this suggest?
+pheatmap(dist_mat, color = colorRampPalette(rev(brewer.pal(n = 7, name =
+  "PRGn")))(100))
+# do the clustering based on this distance metric
+ts_clusters <- hclust(dist_mat, method="complete") # method could be 'average' or diana (for DIvisive ANAlysis Clustering)
+# simple dendrogram; what height might we cut the tree at
+plot(ts_clusters)
+
+# k for cluster which is 3 (arbitrary) 
+# ask Simone etc for advice on the cluster number
+num_of_clus <- 4
+
+# hc clustering
+hclus <- cutree(ts_clusters, k = num_of_clus) %>% as.data.frame(.) %>% rename(. ,cluster_group = .) %>% rownames_to_column("subj")
+
+clus_cols <- brewer.pal(num_of_clus, 'Dark2')
+
+hcdata <- dendro_data(ts_clusters)
+names_order <- hcdata$labels$label # get names order from dendrogram object
+
+p1 <- ggdendrogram(hcdata, rotate=TRUE, leaf_labels=TRUE) +
+      + theme(axis.text.x = element_blank()) 
+
+p2_data <- ts_samp %>% mutate(Time = as.POSIXct(strptime(ts$Time, format="%H:%M:%S"))) %>% tidyr::pivot_longer(cols = -Time , names_to = 'subj', values_to = 'value') %>% dplyr::full_join(., hclus, by = "subj")  %>%  mutate(subj = factor(subj, levels = rev(as.character(names_order))))
+
+p2 <- ggplot(p2_data, aes(x = Time, y = value, colour = as.factor(cluster_group))) + geom_line() + facet_wrap(~subj, ncol = 1, strip.position="left") + guides(color=FALSE) + theme_bw() + scale_colour_manual(values=clus_cols, breaks = c(1, 2, 3))
+```
+# https://stackoverflow.com/questions/19235466/how-do-i-plot-time-hhmmss-in-x-axis-in-r
+
+```{r}
+
+p2 <- p2 + theme(strip.background = element_blank(), strip.text = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x = element_text(angle = 45, hjust=0.8, size=7)) + scale_x_datetime(breaks = date_breaks("1 hour"), labels = date_format("%H:%M"), expand = c(0,0))
+
+gp1<-ggplotGrob(p1)
+gp2<-ggplotGrob(p2) 
+grid.arrange(gp2, gp1, ncol=2, heights=c(4,2))
+
+```
+## dtwclust
+```{r}
+library(tidyverse)
+theme_set(theme_bw())
+library(dtwclust) # time series clustering methods
+library(ggdendro) # dendrograms with ggplot2
+library(gridExtra) # for plot layout
+library(RColorBrewer) # palette
+library(pheatmap) # heatmaps
+setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica")
+rm(list=ls())
+
+ts <- read_csv('sat_only_4_dtw.csv')
+tm <- ts$Time
+# randomly sample to 20 only for testing
+samp_idx <- sample(seq(3,114), 20, replace=FALSE)
+ts_samp <- ts[,samp_idx]
+
+# hc_sbd <- tsclust(t(ts_samp), type = "h", k = 4,
+#                   preproc = zscore, seed = 899,
+#                   distance = "sbd", centroid = shape_extraction,
+#                   control = hierarchical_control(method = "average"))
+
+ts_clusters <- tsclust(t(ts_samp), distance = 'dtw_basic', type = 'partitional', centroid = 'shape')
+# simple dendrogram; what height might we cut the tree at
+plot(ts_clusters, type='sc')
+c1 <- plot(ts_clusters, type = "centroids", clus = 1)
+c2 <- plot(ts_clusters, type = "centroids", clus = 2)
+grid.arrange(c1, c2, nrow=2)
+
+# By default, the dendrogram is plotted in hierarchical clustering
+plot(hc_sbd)
+# prototypes
+plot(hc_sbd, type = "sc")
+# just one
+plot(hc_sbd, type = "series", clus = 3)
+# prototype for just one
+plot(hc_sbd, type = "centroids", clus = 3)
+
+```

@@ -1,0 +1,114 @@
+---
+title: "SA Activity Data Clustering"
+author: "Iain J Gallagher - adapted by Paul McMenemy 18/10/2020"
+date: "03/03/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r} 
+if (!"tidyverse" %in% installed.packages()) ##
+  install.packages("tidyverse") ##
+library("tidyverse")##
+
+if (!"lubridate" %in% installed.packages()) ##
+  install.packages("lubridate") ##
+library("lubridate") ##
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Intro
+Activity data was recorded on elderly South Africans using the Actigraph instrument over 1 week.
+
+## Load the data
+There are 136 separate files in .csv format. Each of these has 10 leading rows that contain metadata and can be skipped. We will loop over these 136 files and:
+
+* ignore the first 10 rows
+* grab the uppercase letters and dates from the file names and concatenate these as ids
+* collate the files into long format with an additional subject id column
+
+The input filenames have the following format:
+
+Firstname Lastname (yyyy-mm-dd)5sec60sec180secDataTable.csv
+
+I will identify subjects in the data by initials and the date in parentheses in the filename; i.e. (X(X)X_yyy-mm-dd).
+
+I tidied up a few typos/inconsistencies in the filenames (e.g., extra spaces etc.) and deleted a couple of .agd files that were included in the directory. The original files from Simone Tomaz are in the original_files directory.
+
+#### Duplicated data
+One subject has duplicated data (i.e., was assessed on separate occasions (MS (2018-10-04)5sec60sec180secDataTable.csv & MS (2018-11-07)5sec60sec180secDataTable.csv). The dataset marked 2018-11-07 looks complete (3700 measures) so I dropped the other dataset.
+
+### Collate the files
+The code below does the data collation & adds a subject id and weekday of measure to the raw data files. The final collated data is written out as ```collated_activity_data.csv'```.
+```{r}
+rm(list=ls())
+
+#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") # Iain's wd
+folders <- "M:/Sarcopenia Work/R Code" ##
+setwd(folders) ## Paul's wd ##
+
+len_folders <- lengths(str_extract_all(folders, "[A-Z]")) ## used later to improve subj_id string
+
+# function to generate an id string for file naming
+id_string <- function(input_string){
+  
+  # create subject ID from file name
+  input_string <- file_to_read
+  id_vars <- str_replace(input_string, '5sec60sec180secDataTable.csv', '')
+  subj_id <- str_extract(id_vars, "[:upper:]{1}" )[1:2]
+
+  subj_id <- str_extract_all(id_vars, "[A-Z]")
+  subj_id <- paste0(unlist(subj_id), collapse='')
+  ## remove any characters that are part of the data folder address to tidy up subj_id
+  subj_id <- substr(subj_id, len_folders+1, nchar(subj_id))
+
+  date_id <- str_extract(id_vars, "[:digit:].*")
+  date_id <- str_replace(date_id, '\\)', '')
+  subj_id <- paste(subj_id, date_id, sep='_')
+  
+  return(subj_id)
+}
+
+# list of files to process
+fls <- list.files(paste0(folders,'/actigraph_data/')) ##
+
+# filter out any files which are not in .csv format (.agd files were throwing errors) ##
+fls <- subset(fls, endsWith(fls, ".csv"))
+
+# read first file
+file_to_read <- paste(folders,'actigraph_data', fls[1], sep='/') ##
+
+# create subject ID from file name
+subj_id <- id_string(file_to_read)
+```
+### Suppress read_csv terminal outputs (PMCM 31/10/20)
+Adding a break in the R Code here to allow terminal message output from 'read_csv' command to be suppressed
+
+```{r message = FALSE}
+# get data
+all_data <- read_csv(file_to_read, skip=10)
+# add subj_id & parse Date column to Date class
+all_data <- all_data %>% mutate(subj = rep(subj_id, nrow(all_data))) %>% mutate(Date = as.POSIXct(Date, format="%d/%m/%Y"))
+# add day of week using wday function
+all_data <- all_data %>% mutate(Weekday = wday(Date, label=TRUE, abbr=TRUE))
+
+# read rest of files and append
+for (f in fls[-1]){
+  file_to_read <- paste(folders,'actigraph_data', f, sep='/')
+  
+  # apply id_string function
+  subj_id <- id_string(file_to_read)
+  # get data from .csv files - skip any that are not .csv file types
+  
+    fl <- read_csv(file_to_read, skip=10)
+
+    fl <- fl %>% mutate(subj = rep(subj_id, nrow(fl))) %>% mutate(Date = as.POSIXct(Date, format="%d/%m/%Y"))
+    fl <- fl %>% mutate(Weekday = wday(Date, label=TRUE, abbr=TRUE))
+    all_data <- bind_rows(all_data, fl)
+}
+
+write_csv(all_data, 'collated_activity_data.csv')
+```

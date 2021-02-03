@@ -1,0 +1,64 @@
+---
+title: "SA_activity_data_alignment"
+author: "Iain J Gallagher - adapted by Paul McMenemy 18/10/2020 onwards"
+date: "04/03/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+if (!"tidyverse" %in% installed.packages()) ##
+  install.packages("tidyverse") ##
+library("tidyverse")##
+
+if (!"lubridate" %in% installed.packages()) ##
+  install.packages("lubridate") ##
+library("lubridate") ##
+```
+### Run 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The code in this file gathers the axis 1 data from the SA activity data, separates out the weekend data and aligns the timeseries from each participant so that the timeseries all 'start' at 12am on Sat and run to 12am on Mon - i.e., over the whole weekend.
+
+```{r}
+
+# theme_set(theme_bw()) ## not used in this .Rmd
+rm(list=ls())
+
+#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") # Iain's wd
+folders <- "M:/Sarcopenia Work/R Code" ##
+setwd(folders) ## Paul's wd ##
+
+# get the data
+data_in <- read_csv('collated_activity_data.csv')
+
+# filter to  12am Sat to 12am Mon
+filter_vals <- c('Sat') # just Sat first to test
+filter1 <- data_in %>% filter(Weekday %in% filter_vals)
+table(filter1$Date, filter1$subj, filter1$Weekday)
+# just axis 1, time, subject and Weekday vars
+filter2 <- filter1 %>% select(Date, Time, Axis1, subj, Weekday)
+
+# identify which people have more than one Sat value, i.e., who was measured over two Sats
+# count values per date for each person
+count_dates <- filter2 %>% group_by(Date, subj) %>% count() %>% filter(n !=480)
+count_names <- filter2 %>% group_by(subj) %>% count() %>% filter(n !=480)
+# 3 min time measures over 24hrs = 24*(60/3) = 480; so should be 480 measures for one day
+# ggplot(count_dates, aes(subj, n)) + geom_point()
+# we want to drop dates that have activity counts greater than 480
+
+# we can use anti_join(x,y, by=...)
+# return all rows from x where there are not matching values in y, keeping just columns from x.
+filter3 <- filter2 %>% anti_join(count_names, by = c('subj'))
+# count_dates <- fil3 %>% group_by(Date, subj) %>% count() # check counts, looks ok
+# now spread these out so we have each subject as a colname
+sp_filter3 <- filter3 %>% pivot_wider(id_cols = c(Time, Weekday), names_from = subj, values_from = Axis1)
+# write out and try DTW on this
+write_csv(sp_filter3, 'sat_only_4_dtw.csv')
+```

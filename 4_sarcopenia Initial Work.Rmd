@@ -1,0 +1,57 @@
+---
+title: "4 Sarcopenia Initial Work"
+author: "Paul McMenemy - based on initial work by Iain Gallagher"
+date: "12/03/2020"
+output: html_notebook
+---
+
+## 1) Preamble 
+
+Inthis section we install and/or load any packages we require, and set working directory(s)
+
+See https://www.datanovia.com/en/lessons/k-means-clustering-in-r-algorith-and-practical-examples/#computing-k-means-clustering-in-r for more details on kmeans vs knn clustering
+
+```{r}
+
+rm(list=ls()) # clear working directory
+
+#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") ## Iain's wd
+folders <- "M:/Sarcopenia Work/R Code" 
+setwd(folders) ## Paul's wd ##
+
+if (!"stats" %in% installed.packages()) install.packages("stats") 
+library("stats") # for kmeans function
+
+# Install Rtools from https://cran.rstudio.com/bin/windows/Rtools/ to use factoextra package
+
+if (!"factoextra" %in% installed.packages()) install.packages("factoextra") 
+library("factoextra") # recommended for some nice outputs
+
+```
+
+## 2) Load the data to be analysed and prepare it for kmeans clustering algorithm
+
+```{r}
+# this data is for weekday = Saturday only - use this as trial for kmeans clustering
+sat_only_4_dtw <- read_csv("M:/Sarcopenia Work/R Code/sat_only_4_dtw.csv")
+
+sat_only_4_dtw_Prepped <- sat_only_4_dtw[,-c(1:2)]
+```
+## 3) From factoextra package, run function to determine and plot the optimal number of clusters
+
+```{r}
+# run alogrithm to determine optimal number of clusters ("elbow" method)
+fviz_nbclust(sat_only_4_dtw_Prepped, kmeans, method = "wss")
+# run it on a transpose of the dataframe, as I'm not sure whether the subject's should be columns or rows, but the convention is that subject records are represneted as rows in dataframes, tuples, table records, etc.
+fviz_nbclust(t(sat_only_4_dtw_Prepped), kmeans, method = "wss")
+
+```
+## now run the same algorithm using the silhouette method, as this may remove the ambiguity from the "wss" results
+
+```{r}
+# run alogrithm to determine optimal number of clusters ("silhouette" method)
+fviz_nbclust(sat_only_4_dtw_Prepped, kmeans, method = "silhouette")
+# run it on a transpose of the dataframe, as I'm not sure whether the subject's should be columns or rows, but the convention is that subject records are represented as rows in dataframes, tuples, table records, etc.
+fviz_nbclust(t(sat_only_4_dtw_Prepped), kmeans, method = "silhouette")
+```
+
