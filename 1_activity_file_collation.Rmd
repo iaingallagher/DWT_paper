@@ -36,7 +36,7 @@ Firstname Lastname (yyyy-mm-dd)5sec60sec180secDataTable.csv
 
 I will identify subjects in the data by initials and the date in parentheses in the filename; i.e. (X(X)X_yyy-mm-dd).
 
-I tidied up a few typos/inconsistencies in the filenames (e.g., extra spaces etc.) and deleted a couple of .agd files that were included in the directory. The original files from Simone Tomaz are in the original_files directory.
+I tidied up a few typos/inconsistencies in the filenames (e.g., extra spaces etc.) and deleted a couple of .agd files that were included in the directory. The original files from Simone Tomaz are in the ```original_files``` directory.
 
 #### Duplicated data
 One subject has duplicated data (i.e., was assessed on separate occasions (MS (2018-10-04)5sec60sec180secDataTable.csv & MS (2018-11-07)5sec60sec180secDataTable.csv). The dataset marked 2018-11-07 looks complete (3700 measures) so I dropped the other dataset.
@@ -46,9 +46,9 @@ The code below does the data collation & adds a subject id and weekday of measur
 ```{r}
 rm(list=ls())
 
-#setwd("~/Dropbox (Personal)/Work/Results/SouthAfrica") # Iain's wd
-folders <- "M:/Sarcopenia Work/R Code" ##
-setwd(folders) ## Paul's wd ##
+folders <- "~/Dropbox (Personal)/Work/Results/SouthAfrica" # Iain's wd
+# folders <- "M:/Sarcopenia Work/R Code" ## Paul's wd ##
+setwd(folders) 
 
 len_folders <- lengths(str_extract_all(folders, "[A-Z]")) ## used later to improve subj_id string
 
@@ -62,6 +62,7 @@ id_string <- function(input_string){
 
   subj_id <- str_extract_all(id_vars, "[A-Z]")
   subj_id <- paste0(unlist(subj_id), collapse='')
+  
   ## remove any characters that are part of the data folder address to tidy up subj_id
   subj_id <- substr(subj_id, len_folders+1, nchar(subj_id))
 
@@ -73,7 +74,14 @@ id_string <- function(input_string){
 }
 
 # list of files to process
-fls <- list.files(paste0(folders,'/actigraph_data/')) ##
+# we should sort out with some proper folder structure; issue added to repo 2 discuss with paul
+# fls <- list.files(paste0(folders,'/actigraph_data/')) ##
+fls <- list.files('actigraph_data/')
+
+# all names, can delete later
+# nms <-str_replace(fls, '5sec60sec180secDataTable.csv', '') %>% str_replace('\\(', '') %>% str_replace('\\)', '')
+# nms <- as.data.frame(nms)
+# write_csv(nms, 'DWT_paper/generated_data/all_names.csv')
 
 # filter out any files which are not in .csv format (.agd files were throwing errors) ##
 fls <- subset(fls, endsWith(fls, ".csv"))
