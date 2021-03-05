@@ -119,4 +119,11 @@ for (f in fls[-1]){
 }
 
 write_csv(all_data, 'collated_activity_data.csv')
+
+# split all_data into separate days and output the separate day data as separate files
+days <- unique(as.character(all_data$Weekday))
+
+for (day in days){
+  day_data <- all_data %>% filter(Weekday == day) %>% write_csv(paste(day, '_data.csv', sep = ''))
+}
 ```
