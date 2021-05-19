@@ -127,7 +127,7 @@ Somine Tomasz provided clinical data with details of sex and other clinical char
 ```{r}
 # male & female data
 clin_data <- read_csv('clin_vars/Sarcopenia_study_FINAL_March_2021.csv')
-clin_data <- clin_data %>% select(ag_ID, gender0m1f) %>% rename(subj = ag_ID) #colname in clin data same as colname in activity data
+clin_data <- clin_data %>% select(`ag ID`, gender0m1f) %>% rename(subj = `ag ID`) # colname in clin data same as colname in activity data; using `ag ID` because some weird bug won't reload the file!
 # keep clinical data to just those in activity data, right join to include all rows in clin with match in activity
 all_data <- right_join(clin_data, all_data, by = 'subj')
 # filter datasets
@@ -135,12 +135,18 @@ male_data <- all_data %>% filter(gender0m1f == 0)
 female_data <- all_data %>% filter(gender0m1f == 1)
 # length(unique(female_data$subj)) # 109 females
 # length(unique(male_data$subj)) # 23 males
+```
+
+We'll now write out the data.
+
+```{r}
 # write datasets
 write_csv(male_data, 'generated_data/male_activity_data.csv')
 write_csv(female_data, 'generated_data/female_activity_data.csv')
 ```
 
 For each of the male and female datasets we will now split the data into files for separate week days.
+
 ```{r}
 # takes dataset, parses out gender part for file name & splits into weekday specific files
 get_days <- function(data_set){
