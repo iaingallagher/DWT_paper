@@ -121,7 +121,7 @@ for (f in fls[-1]){
     all_data <- bind_rows(all_data, fl)
 }
 
-write_csv(all_data, 'collated_activity_data.csv')
+write_csv(all_data, 'all_collated_activity_data.csv')
 ```
 
 ### Drop some extra measurements
