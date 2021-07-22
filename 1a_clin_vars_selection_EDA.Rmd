@@ -1,0 +1,96 @@
+---
+title: "SA DTW Project Clin Vars Explorations"
+author: "Iain J Gallagher"
+date: "06/05/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Simone suggests the following clinical variables (as a starting point) for examination within clusters.
+
+*age
+*weight (Kg)
+*gender (0 = m; 1 = f)
+*WHR
+*Sys bp (mmHg)
+*Dia BP (mmHg)
+*Fat free soft tissue mass % 
+*glucose (check units)
+*insulin (check units)
+*cholesterol (total - check units)
+*triglycerides (check units)
+*HbA1C (%)
+*3 meter timed up & go (s)
+*10 meter walk test (s)
+*6 meter walk test (s) - do we need this & 10?
+*6 min walk test total distance
+*No of Grandchildren
+*Caring responsibilities for Grandchildren
+*Health rating as per [EQ5D-3L scale](https://euroqol.org/eq-5d-instruments/eq-5d-3l-about/)
+
+In this document we will load all the clinical data we have, select out the relevant columns, match the data to the IDs in the activity data we have and carry out some EDA. 
+
+```{r}
+# load relevant libraries
+library(tidyverse)
+theme_set(theme_bw())
+rm(list=ls())
+```
+
+# Get the data
+
+```{r}
+# load the IDs for individuals in activty dataset
+ids <- read_csv('DWT_paper/generated_data/all_abbrv_ids.csv')
+# load the complete data
+all_data <- read_csv('DWT_paper/clin_vars/Sarcopenia_study_FINAL_March_2021.csv')
+# variables to select
+select_vars <- c('age', 'ag_ID', 'weight_kg', 'gender0m1f', 'WHR', 'bp_sys', 'bp_dys', 'FFSTM_subtotal_%', 'glucose', 'insulin', 'total_chol', 'trigs', 'hba1c', 'up_go_3m_sec', 'ten_m_walk_test_sec', 'six_m_walk_sec', 'six_minute_total_distance_m', 'Grandchildren', 'Grandchild_care', 'Sum_EQ5D_3L')
+# filter
+vars_sel <- all_data %>% select(all_of(select_vars))
+# match to IDs in activity data; semi_join, keep vars_sel with match in ids
+vars_sel_id_filtered <- semi_join(vars_sel, ids, by = 'ag_ID')
+
+# check for missing values
+ids_missing_data <- vars_sel_id_filtered[which(complete.cases(vars_sel_id_filtered) == FALSE),]$ag_ID
+ids_missing_data  <- tibble(ids_missing_data)
+# write out
+write_csv(ids_missing_data, 'generated_data/ids_with_missing_clinical_data.csv')
+```
+
+There are 133 subjects with available clinical variables that also have activity data to cluster by. Of these 133 13 have some missing values. The missing values seem to be mainly biochemical variables - blood glucose, insulin, cholesterol, triglycerides and HbA1C.
+
+# EDA Plots
+
+Let's plot the data and examine for unrealistic values.
+
+```{r}
+# pivot data to long
+vars_sel_id_filtered_long <- vars_sel_id_filtered %>% pivot_longer(cols = c(3, 5:20), names_to = 'var', values_to = 'value')
+# head(vars_sel_id_filtered_long)
+# plotting
+ggplot(vars_sel_id_filtered_long, aes(as.factor(gender0m1f), value)) + geom_boxplot() + facet_wrap(~var, scales = 'free_y')
+```
+
+These look ok overall. Let's have a quick look at the HbA1c plot which looks a bit compressed for the males.
+
+```{r}
+vars_sel_id_filtered %>% select(gender0m1f, hba1c) %>% pivot_longer(hba1c, names_to = 'hba1c', values_to = 'value') %>% ggplot(aes(as.factor(gender0m1f), value)) + geom_boxplot()
+```
+
+Ok, looks fine. 
+
+What's the gender balance?
+
+```{r}
+vars_sel_id_filtered %>% group_by(gender0m1f) %>% summarise(n())
+```
+
+23 males and 110 females. So quite a bit of gender imbalance. Since the activity data will be used to drive the clustering we should look at potential differences in 'activity' variables between men and women in the data.
