@@ -128,14 +128,15 @@ write_csv(all_data, 'collated_activity_data.csv')
 Some people have more than a weeks worth of data. We'll trim the data for each subject down to only a weeks worth of data.
 
 ```{r}
+# add column to id first & last dates for subj specific filter
 one_week_data <- all_data %>% mutate(Date = as_date(Date)) %>% group_by(subj) %>% 
   mutate(first_date = min(Date), last_date = first_date + days(6)) %>% filter(between(Date, unique(first_date), unique(last_date)))
 
-# one_week_data %>% summarise(n = n_distinct(Date))
+# test <- one_week_data %>% summarise(n = n_distinct(Date))
 # everyone has 7 days
 ```
 
-Somine Tomasz provided clinical data with details of sex and other clinical characteristics. We will filter the whole dataset down to separate male and female files.
+Simone Tomasz provided clinical data with details of sex and other clinical characteristics. We will filter the whole dataset down to separate male and female files.
 
 ```{r}
 # male & female data
@@ -144,7 +145,7 @@ clin_data <- clin_data %>% select(`ag ID`, gender0m1f) %>% rename(subj = `ag ID`
 # keep clinical data to just those in activity data, right join to include all rows in clin with match in activity
 one_week_data <- right_join(clin_data, one_week_data, by = 'subj')
 # filter datasets
-male_data <- one_week_data_data %>% filter(gender0m1f == 0)
+male_data <- one_week_data %>% filter(gender0m1f == 0)
 female_data <- one_week_data %>% filter(gender0m1f == 1)
 # length(unique(female_data$subj)) # 109 females
 # length(unique(male_data$subj)) # 23 males
